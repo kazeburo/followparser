@@ -12,6 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// initialBufSize for bufio
+var initialBufSize = 10000
+
+// maxBufSize for bufio default 65537
+var maxBufSize = 1000000
+
 // MaxReadSize : Maximum size for read
 var MaxReadSize int64 = 500 * 1000 * 1000
 
@@ -76,6 +82,7 @@ func parseFile(logFile string, lastPos int64, posFile string, cb callback, logge
 
 	total := 0
 	bs := bufio.NewScanner(fpr)
+	bs.Buffer(make([]byte, initialBufSize), maxBufSize)
 	for {
 		e := parseLog(bs, cb, logger)
 		if e == io.EOF {
