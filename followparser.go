@@ -16,7 +16,7 @@ import (
 var initialBufSize = 10000
 
 // maxBufSize for bufio default 65537
-var maxBufSize = 1000000
+var maxBufSize = 5 * 1000 * 1000
 
 // MaxReadSize : Maximum size for read
 var MaxReadSize int64 = 500 * 1000 * 1000
