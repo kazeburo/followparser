@@ -31,11 +31,9 @@ func parseLog(bs *bufio.Scanner, cb callback, logger *zap.Logger) error {
 		b := bs.Bytes()
 		err := cb.Parse(b)
 		if err != nil {
-			logger.Warn("Failed to convert status. continue", zap.Error(err))
-			continue
+			logger.Warn("Failed to parse log", zap.Error(err))
 		}
 		return nil
-
 	}
 	if bs.Err() != nil {
 		return bs.Err()
