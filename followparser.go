@@ -4,12 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
-
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 // initialBufSize for bufio
@@ -26,12 +24,12 @@ type callback interface {
 	Finish(duration float64)
 }
 
-func parseLog(bs *bufio.Scanner, cb callback, logger *zap.Logger) error {
+func parseLog(bs *bufio.Scanner, cb callback) error {
 	for bs.Scan() {
 		b := bs.Bytes()
 		err := cb.Parse(b)
 		if err != nil {
-			logger.Warn("Failed to parse log", zap.Error(err))
+			log.Printf("Failed to parse log :%v", err)
 		}
 		return nil
 	}
@@ -41,22 +39,18 @@ func parseLog(bs *bufio.Scanner, cb callback, logger *zap.Logger) error {
 	return io.EOF
 }
 
-func parseFile(logFile string, lastPos int64, posFile string, cb callback, logger *zap.Logger) error {
+func parseFile(logFile string, lastPos int64, posFile string, cb callback) error {
 	stat, err := os.Stat(logFile)
 	if err != nil {
-		return errors.Wrap(err, "failed to stat log file")
+		return fmt.Errorf("failed to stat log file :%v", err)
 	}
 
 	fstat, err := fileStat(stat)
 	if err != nil {
-		return errors.Wrap(err, "failed to inode of log file")
+		return fmt.Errorf("failed to inode of log file: %v", err)
 	}
 
-	logger.Info("Analysis start",
-		zap.String("logFile", logFile),
-		zap.Int64("lastPos", lastPos),
-		zap.Int64("Size", stat.Size()),
-	)
+	log.Printf("Analysis start logFile:%s lastPos:%d Size:%d", logFile, lastPos, stat.Size())
 
 	if lastPos == 0 && stat.Size() > MaxReadSize {
 		// first time and big logfile
@@ -70,46 +64,42 @@ func parseFile(logFile string, lastPos int64, posFile string, cb callback, logge
 
 	f, err := os.Open(logFile)
 	if err != nil {
-		return errors.Wrap(err, "failed to open log file")
+		return fmt.Errorf("failed to open log file :%v", err)
 	}
 	defer f.Close()
 	fpr, err := NewReader(f, lastPos)
 	if err != nil {
-		return errors.Wrap(err, "failed to seek log file")
+		return fmt.Errorf("failed to seek log file :%v", err)
 	}
 
 	total := 0
 	bs := bufio.NewScanner(fpr)
 	bs.Buffer(make([]byte, initialBufSize), maxBufSize)
 	for {
-		e := parseLog(bs, cb, logger)
+		e := parseLog(bs, cb)
 		if e == io.EOF {
 			break
 		}
 		if e != nil {
-			return errors.Wrap(e, "Something wrong in parse log")
+			return fmt.Errorf("Something wrong in parse log :%v", e)
 		}
 		total++
 	}
 
-	logger.Info("Analysis completed",
-		zap.String("logFile", logFile),
-		zap.Int64("startPos", lastPos),
-		zap.Int64("endPos", fpr.Pos),
-		zap.Int("Rows", total),
-	)
+	log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
+
 	// update postion
 	if posFile != "" {
 		err = writePos(posFile, fpr.Pos, fstat)
 		if err != nil {
-			return errors.Wrap(err, "failed to update pos file")
+			return fmt.Errorf("failed to update pos file :%v", err)
 		}
 	}
 	return nil
 }
 
 // Parse : parse logfile
-func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
+func Parse(posFileName, logFile string, cb callback) error {
 	lastPos := int64(0)
 	lastFstat := &fStat{}
 	tmpDir := os.TempDir()
@@ -124,7 +114,7 @@ func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
 	if fileExists(posFile) {
 		l, d, f, err := readPos(posFile)
 		if err != nil {
-			return errors.Wrap(err, "failed to load pos file")
+			return fmt.Errorf("failed to load pos file :%v", err)
 		}
 		lastPos = l
 		duration = d
@@ -132,11 +122,11 @@ func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
 	}
 	stat, err := os.Stat(logFile)
 	if err != nil {
-		return errors.Wrap(err, "failed to stat log file")
+		return fmt.Errorf("failed to stat log file :%v", err)
 	}
 	fstat, err := fileStat(stat)
 	if err != nil {
-		return errors.Wrap(err, "failed to get inode from log file")
+		return fmt.Errorf("failed to get inode from log file :%v", err)
 	}
 	if fstat.IsNotRotated(lastFstat) {
 		err := parseFile(
@@ -144,26 +134,22 @@ func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
 			lastPos,
 			posFile,
 			cb,
-			logger,
 		)
 		if err != nil {
 			return err
 		}
 	} else {
 		// rotate!!
-		logger.Info("Detect Rotate")
+		log.Printf("Detect Rotate")
 		lastFile, err := searchFileByInode(filepath.Dir(logFile), lastFstat)
 		if err != nil {
-			logger.Warn("Could not search previous file",
-				zap.Error(err),
-			)
+			log.Printf("Could not search previous file :%v", err)
 			// new file
 			err := parseFile(
 				logFile,
 				0, // lastPos
 				posFile,
 				cb,
-				logger,
 			)
 			if err != nil {
 				return err
@@ -175,7 +161,6 @@ func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
 				0, // lastPos
 				posFile,
 				cb,
-				logger,
 			)
 			if err != nil {
 				return err
@@ -186,12 +171,9 @@ func Parse(posFileName, logFile string, cb callback, logger *zap.Logger) error {
 				lastPos,
 				"", // no update posfile
 				cb,
-				logger,
 			)
 			if err != nil {
-				logger.Warn("Could not parse previous file",
-					zap.Error(err),
-				)
+				log.Printf("Could not parse previous file :%v", err)
 			}
 		}
 	}
