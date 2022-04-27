@@ -81,7 +81,7 @@ func parseFile(logFile string, lastPos int64, posFile string, cb callback) error
 			break
 		}
 		if e != nil {
-			return fmt.Errorf("Something wrong in parse log :%v", e)
+			return fmt.Errorf("something wrong in parse log :%v", e)
 		}
 		total++
 	}

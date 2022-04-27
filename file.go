@@ -26,15 +26,15 @@ type fStat struct {
 
 // FileExists :
 func fileExists(filename string) bool {
-	_, err := os.Stat(filename)
-	return err == nil
+	s, err := os.Stat(filename)
+	return err == nil && s.Size() > 0
 }
 
 // FileStat :
 func fileStat(s os.FileInfo) (*fStat, error) {
 	s2 := s.Sys().(*syscall.Stat_t)
 	if s2 == nil {
-		return &fStat{}, fmt.Errorf("Could not get Inode")
+		return &fStat{}, fmt.Errorf("could not get inode")
 	}
 	return &fStat{s2.Ino, uint64(s2.Dev)}, nil
 }
@@ -59,7 +59,7 @@ func searchFileByInode(d string, fstat *fStat) (string, error) {
 			return filepath.Join(d, file.Name()), nil
 		}
 	}
-	return "", fmt.Errorf("There is no file by inode:%d in %s", fstat.Inode, d)
+	return "", fmt.Errorf("there is no file by inode:%d in %s", fstat.Inode, d)
 }
 
 // WritePos :
