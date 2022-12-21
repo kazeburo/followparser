@@ -25,27 +25,35 @@ type Callback interface {
 }
 
 type Parser struct {
-	maxReadSize int64
-}
-
-func New(s int64) *Parser {
-	return &Parser{maxReadSize: s}
+	WorkDir     string
+	MaxReadSize int64
+	Callback    Callback
 }
 
 func Parse(posFileName, logFile string, cb Callback) error {
-	parser := New(DefaultMaxReadSize)
-	return parser.parse(posFileName, logFile, cb)
+	parser := &Parser{
+		Callback: cb,
+	}
+	return parser.Parse(posFileName, logFile)
 }
 
-func (parser *Parser) parse(posFileName, logFile string, cb Callback) error {
-	tmpDir := os.TempDir()
+func (parser *Parser) Parse(posFileName, logFile string) error {
+	if parser.WorkDir == "" {
+		parser.WorkDir = os.TempDir()
+	}
+	if parser.MaxReadSize == 0 {
+		parser.MaxReadSize = DefaultMaxReadSize
+	}
+	if parser.Callback == nil {
+		parser.Callback = &dummyParser{}
+	}
 	curUser, _ := user.Current()
 	uid := "0"
 	if curUser != nil {
 		uid = curUser.Uid
 	}
 
-	pf := newPosFile(filepath.Join(tmpDir, fmt.Sprintf("%s-%s", posFileName, uid)))
+	pf := newPosFile(filepath.Join(parser.WorkDir, fmt.Sprintf("%s-%s", posFileName, uid)))
 	lastPos, duration, lastFstat, err := pf.read()
 	if err != nil {
 		return fmt.Errorf("failed to load pos file :%v", err)
@@ -56,12 +64,11 @@ func (parser *Parser) parse(posFileName, logFile string, cb Callback) error {
 		return fmt.Errorf("failed to get inode from log file :%v", err)
 	}
 	// return fmt.Errorf("%v", lastFstat)
-	if fstat.IsNotRotated(lastFstat) {
+	if fstat.isNotRotated(lastFstat) {
 		err := parser.parseFile(
 			logFile,
 			lastPos,
 			pf,
-			cb,
 		)
 		if err != nil {
 			return err
@@ -69,7 +76,7 @@ func (parser *Parser) parse(posFileName, logFile string, cb Callback) error {
 	} else {
 		// rotate found
 		log.Printf("Detect Rotate")
-		lastFile, err := searchFileByInode(filepath.Dir(logFile), lastFstat)
+		lastFile, err := lastFstat.searchFileByInode(filepath.Dir(logFile))
 		if err != nil {
 			log.Printf("Could not search previous file :%v", err)
 			// new file only
@@ -77,41 +84,38 @@ func (parser *Parser) parse(posFileName, logFile string, cb Callback) error {
 				logFile,
 				0, // lastPos
 				pf,
-				cb,
 			)
 			if err != nil {
 				return err
 			}
 		} else {
-			// new file
-			err := parser.parseFile(
-				logFile,
-				0, // lastPos
-				pf,
-				cb,
-			)
-			if err != nil {
-				return err
-			}
 			// previous file
 			err = parser.parseFile(
 				lastFile,
 				lastPos,
 				nil, // no update posfile
-				cb,
 			)
 			if err != nil {
 				log.Printf("Could not parse previous file :%v", err)
 			}
+			// new file
+			err := parser.parseFile(
+				logFile,
+				0, // lastPos
+				pf,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	cb.Finish(duration)
+	parser.Callback.Finish(duration)
 
 	return nil
 }
 
-func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile, cb Callback) error {
+func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) error {
 
 	fstat, err := fileStat(logFile)
 	if err != nil {
@@ -120,12 +124,12 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile, cb C
 
 	log.Printf("Analysis start logFile:%s lastPos:%d Size:%d", logFile, lastPos, fstat.Size)
 
-	if lastPos == 0 && fstat.Size > parser.maxReadSize {
+	if lastPos == 0 && fstat.Size > parser.MaxReadSize {
 		// first time and big logfile
 		lastPos = fstat.Size
 	}
 
-	if fstat.Size-lastPos > parser.maxReadSize {
+	if fstat.Size-lastPos > parser.MaxReadSize {
 		// big delay
 		lastPos = fstat.Size
 	}
@@ -144,7 +148,7 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile, cb C
 	bs := bufio.NewScanner(fpr)
 	bs.Buffer(make([]byte, initialBufSize), maxBufSize)
 	for {
-		e := parser.parseLog(bs, cb)
+		e := parser.parseLog(bs)
 		if e == io.EOF {
 			break
 		}
@@ -166,10 +170,10 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile, cb C
 	return nil
 }
 
-func (parser *Parser) parseLog(bs *bufio.Scanner, cb Callback) error {
+func (parser *Parser) parseLog(bs *bufio.Scanner) error {
 	for bs.Scan() {
 		b := bs.Bytes()
-		err := cb.Parse(b)
+		err := parser.Callback.Parse(b)
 		if err != nil {
 			log.Printf("Failed to parse log :%v", err)
 		}

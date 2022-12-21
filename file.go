@@ -94,18 +94,14 @@ func fileStat(filename string) (*fStat, error) {
 	}, nil
 }
 
-// IsNotRotated :
-func (fstat *fStat) IsNotRotated(lastFstat *fStat) bool {
+func (fstat *fStat) isNotRotated(lastFstat *fStat) bool {
 	if lastFstat == nil {
 		return true
 	}
 	return lastFstat.Inode == 0 || lastFstat.Dev == 0 || (fstat.Inode == lastFstat.Inode && fstat.Dev == lastFstat.Dev)
 }
 
-func searchFileByInode(d string, fstat *fStat) (string, error) {
-	if fstat == nil {
-		return "", fmt.Errorf("previous file not found")
-	}
+func (fstat *fStat) searchFileByInode(d string) (string, error) {
 	files, err := ioutil.ReadDir(d)
 	if err != nil {
 		return "", err
