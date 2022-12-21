@@ -10,62 +10,61 @@ import (
 	"time"
 )
 
-// FilePos :
-type filePos struct {
+type fPos struct {
 	Pos   int64   `json:"pos"`
 	Time  float64 `json:"time"`
 	Inode uint64  `json:"inode"`
 	Dev   uint64  `json:"dev"`
 }
 
-// FStat :
 type fStat struct {
 	Inode uint64
 	Dev   uint64
+	Size  int64
 }
 
-// FileExists :
-func fileExists(filename string) bool {
-	s, err := os.Stat(filename)
-	return err == nil && s.Size() > 0
+type posFile struct {
+	filename string
 }
 
-// FileStat :
-func fileStat(s os.FileInfo) (*fStat, error) {
-	s2 := s.Sys().(*syscall.Stat_t)
-	if s2 == nil {
-		return &fStat{}, fmt.Errorf("could not get inode")
+func newPosFile(filename string) *posFile {
+	return &posFile{filename}
+}
+
+func (pf *posFile) read() (int64, float64, *fStat, error) {
+	s, err := os.Stat(pf.filename)
+	if err != nil || s.Size() == 0 {
+		return 0, 0, nil, nil
 	}
-	return &fStat{s2.Ino, uint64(s2.Dev)}, nil
-}
 
-// IsNotRotated :
-func (fstat *fStat) IsNotRotated(lastFstat *fStat) bool {
-	return lastFstat.Inode == 0 || lastFstat.Dev == 0 || (fstat.Inode == lastFstat.Inode && fstat.Dev == lastFstat.Dev)
-}
-
-// SearchFileByInode :
-func searchFileByInode(d string, fstat *fStat) (string, error) {
-	files, err := ioutil.ReadDir(d)
+	d, err := ioutil.ReadFile(pf.filename)
 	if err != nil {
-		return "", err
+		return 0, 0, nil, err
 	}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		s, _ := fileStat(file)
-		if s.Inode == fstat.Inode && s.Dev == fstat.Dev {
-			return filepath.Join(d, file.Name()), nil
-		}
+	fp := fPos{}
+	err = json.Unmarshal(d, &fp)
+	if err != nil {
+		return 0, 0, nil, err
 	}
-	return "", fmt.Errorf("there is no file by inode:%d in %s", fstat.Inode, d)
+	duration := float64(time.Now().Unix()) - fp.Time
+	return fp.Pos,
+		duration,
+		&fStat{
+			Inode: fp.Inode,
+			Dev:   fp.Dev,
+			Size:  0,
+		},
+		nil
 }
 
-// WritePos :
-func writePos(filename string, pos int64, fstat *fStat) error {
-	fp := filePos{pos, float64(time.Now().Unix()), fstat.Inode, fstat.Dev}
-	file, err := os.Create(filename)
+func (pf *posFile) write(pos int64, fstat *fStat) error {
+	fp := fPos{
+		Pos:   pos,
+		Time:  float64(time.Now().Unix()),
+		Inode: fstat.Inode,
+		Dev:   fstat.Dev,
+	}
+	file, err := os.Create(pf.filename)
 	if err != nil {
 		return err
 	}
@@ -76,19 +75,43 @@ func writePos(filename string, pos int64, fstat *fStat) error {
 	}
 	_, err = file.Write(jb)
 	return err
+
 }
 
-// ReadPos :
-func readPos(filename string) (int64, float64, *fStat, error) {
-	fp := filePos{}
-	d, err := ioutil.ReadFile(filename)
+func fileStat(filename string) (*fStat, error) {
+	s, err := os.Stat(filename)
 	if err != nil {
-		return 0, 0, &fStat{}, err
+		return nil, err
 	}
-	err = json.Unmarshal(d, &fp)
+	s2 := s.Sys().(*syscall.Stat_t)
+	if s2 == nil {
+		return nil, fmt.Errorf("could not get inode")
+	}
+	return &fStat{
+		Inode: s2.Ino,
+		Dev:   uint64(s2.Dev),
+		Size:  s.Size(),
+	}, nil
+}
+
+// IsNotRotated :
+func (fstat *fStat) IsNotRotated(lastFstat *fStat) bool {
+	return lastFstat.Inode == 0 || lastFstat.Dev == 0 || (fstat.Inode == lastFstat.Inode && fstat.Dev == lastFstat.Dev)
+}
+
+func searchFileByInode(d string, fstat *fStat) (string, error) {
+	files, err := ioutil.ReadDir(d)
 	if err != nil {
-		return 0, 0, &fStat{}, err
+		return "", err
 	}
-	duration := float64(time.Now().Unix()) - fp.Time
-	return fp.Pos, duration, &fStat{fp.Inode, fp.Dev}, nil
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		s, _ := fileStat(file.Name())
+		if s.Inode == fstat.Inode && s.Dev == fstat.Dev {
+			return filepath.Join(d, file.Name()), nil
+		}
+	}
+	return "", fmt.Errorf("there is no file by inode:%d in %s", fstat.Inode, d)
 }
