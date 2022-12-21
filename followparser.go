@@ -55,6 +55,7 @@ func (parser *Parser) parse(posFileName, logFile string, cb Callback) error {
 	if err != nil {
 		return fmt.Errorf("failed to get inode from log file :%v", err)
 	}
+	// return fmt.Errorf("%v", lastFstat)
 	if fstat.IsNotRotated(lastFstat) {
 		err := parser.parseFile(
 			logFile,
