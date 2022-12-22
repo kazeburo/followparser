@@ -9,7 +9,7 @@ GO111MODULE=on
 tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
-	git push origin main
+	git push origin master
 
 check:
 	go test .
