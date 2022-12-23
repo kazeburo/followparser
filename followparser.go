@@ -148,14 +148,15 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) erro
 	bs := bufio.NewScanner(fpr)
 	bs.Buffer(make([]byte, initialBufSize), maxBufSize)
 	for {
-		e := parser.parseLog(bs)
+		scan, e := parser.parseLog(bs)
+		total += scan
 		if e == io.EOF {
 			break
 		}
 		if e != nil {
 			return fmt.Errorf("something wrong in parse log :%v", e)
 		}
-		total++
+
 	}
 
 	log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
@@ -170,16 +171,18 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) erro
 	return nil
 }
 
-func (parser *Parser) parseLog(bs *bufio.Scanner) error {
+func (parser *Parser) parseLog(bs *bufio.Scanner) (int, error) {
+	scan := 0
 	for bs.Scan() {
 		b := bs.Bytes()
 		err := parser.Callback.Parse(b)
 		if err != nil {
 			log.Printf("Failed to parse log :%v", err)
 		}
+		scan++
 	}
 	if bs.Err() != nil {
-		return bs.Err()
+		return scan, bs.Err()
 	}
-	return io.EOF
+	return scan, io.EOF
 }
