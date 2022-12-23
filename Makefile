@@ -12,4 +12,4 @@ tag:
 	git push origin master
 
 check:
-	go test .
+	go test -v .
