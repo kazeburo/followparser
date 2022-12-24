@@ -30,14 +30,23 @@ type Parser struct {
 	Callback    Callback
 }
 
+type Parsed struct {
+	FileName string
+	Size     int64
+	StartPos int64
+	EndPos   int64
+	Rows     int
+}
+
 func Parse(posFileName, logFile string, cb Callback) error {
 	parser := &Parser{
 		Callback: cb,
 	}
-	return parser.Parse(posFileName, logFile)
+	_, err := parser.Parse(posFileName, logFile)
+	return err
 }
 
-func (parser *Parser) Parse(posFileName, logFile string) error {
+func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	if parser.WorkDir == "" {
 		parser.WorkDir = os.TempDir()
 	}
@@ -56,23 +65,24 @@ func (parser *Parser) Parse(posFileName, logFile string) error {
 	pf := newPosFile(filepath.Join(parser.WorkDir, fmt.Sprintf("%s-%s", posFileName, uid)))
 	lastPos, duration, lastFstat, err := pf.read()
 	if err != nil {
-		return fmt.Errorf("failed to load pos file :%v", err)
+		return nil, fmt.Errorf("failed to load pos file :%v", err)
 	}
 
 	fstat, err := fileStat(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to get inode from log file :%v", err)
+		return nil, fmt.Errorf("failed to get inode from log file :%v", err)
 	}
-	// return fmt.Errorf("%v", lastFstat)
+	result := make([]Parsed, 0)
 	if fstat.isNotRotated(lastFstat) {
-		err := parser.parseFile(
+		parsed, err := parser.parseFile(
 			logFile,
 			lastPos,
 			pf,
 		)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		result = append(result, *parsed)
 	} else {
 		// rotate found
 		log.Printf("Detect Rotate")
@@ -80,17 +90,18 @@ func (parser *Parser) Parse(posFileName, logFile string) error {
 		if err != nil {
 			log.Printf("Could not search previous file :%v", err)
 			// new file only
-			err := parser.parseFile(
+			parsed, err := parser.parseFile(
 				logFile,
 				0, // lastPos
 				pf,
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			result = append(result, *parsed)
 		} else {
 			// previous file
-			err = parser.parseFile(
+			parsed, err := parser.parseFile(
 				lastFile,
 				lastPos,
 				nil, // no update posfile
@@ -98,28 +109,32 @@ func (parser *Parser) Parse(posFileName, logFile string) error {
 			if err != nil {
 				log.Printf("Could not parse previous file :%v", err)
 			}
+			if parsed != nil {
+				result = append(result, *parsed)
+			}
 			// new file
-			err := parser.parseFile(
+			parsed, err = parser.parseFile(
 				logFile,
 				0, // lastPos
 				pf,
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			result = append(result, *parsed)
 		}
 	}
 
 	parser.Callback.Finish(duration)
 
-	return nil
+	return result, nil
 }
 
-func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) error {
+func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Parsed, error) {
 
 	fstat, err := fileStat(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to inode of log file: %v", err)
+		return nil, fmt.Errorf("failed to inode of log file: %v", err)
 	}
 
 	log.Printf("Analysis start logFile:%s lastPos:%d Size:%d", logFile, lastPos, fstat.Size)
@@ -136,12 +151,12 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) erro
 
 	f, err := os.Open(logFile)
 	if err != nil {
-		return fmt.Errorf("failed to open log file :%v", err)
+		return nil, fmt.Errorf("failed to open log file :%v", err)
 	}
 	defer f.Close()
 	fpr, err := newReader(f, lastPos)
 	if err != nil {
-		return fmt.Errorf("failed to seek log file :%v", err)
+		return nil, fmt.Errorf("failed to seek log file :%v", err)
 	}
 
 	total := 0
@@ -154,21 +169,29 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) erro
 			break
 		}
 		if e != nil {
-			return fmt.Errorf("something wrong in parse log :%v", e)
+			return nil, fmt.Errorf("something wrong in parse log :%v", e)
 		}
 
 	}
-
-	log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
 
 	// update postion
 	if pf != nil {
 		err = pf.write(fpr.Pos, fstat)
 		if err != nil {
-			return fmt.Errorf("failed to update pos file :%v", err)
+			return nil, fmt.Errorf("failed to update pos file :%v", err)
 		}
 	}
-	return nil
+
+	parsed := &Parsed{
+		FileName: logFile,
+		Size:     fstat.Size,
+		StartPos: lastPos,
+		EndPos:   fpr.Pos,
+		Rows:     total,
+	}
+	log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
+
+	return parsed, nil
 }
 
 func (parser *Parser) parseLog(bs *bufio.Scanner) (int, error) {

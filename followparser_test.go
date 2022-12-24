@@ -47,13 +47,22 @@ func TestParse(t *testing.T) {
 			WorkDir:  tmpdir,
 			Callback: parser,
 		}
-		err := fp.Parse("logPos", logFileName)
+		r, err := fp.Parse("logPos", logFileName)
 		if err != nil {
 			t.Error(err)
 		}
 		out := parser.Slurp().String()
 		if out != msg {
 			t.Errorf("read '%s' not match expect '%s'", out, msg)
+		}
+		if len(r) != 1 {
+			t.Errorf("result len must be 1 %v", r)
+		}
+		if r[0].Rows != 1 {
+			t.Errorf("result[0].Rows must be 1 %v", r)
+		}
+		if r[0].EndPos-r[0].StartPos != 17 {
+			t.Errorf("r[0].EndPos - r[0].StartPos must be 17 %v", r[0])
 		}
 	}
 
@@ -77,7 +86,7 @@ func TestParse(t *testing.T) {
 		WorkDir:  tmpdir,
 		Callback: parser,
 	}
-	err = fp.Parse("logPos", logFileName)
+	r, err := fp.Parse("logPos", logFileName)
 	if err != nil {
 		t.Error(err)
 	}
@@ -88,5 +97,13 @@ func TestParse(t *testing.T) {
 	if parser.duration < 1 {
 		t.Errorf("duration: %f", parser.duration)
 	}
-
+	if len(r) != 2 {
+		t.Errorf("result len must be 2 %v", r)
+	}
+	if r[0].Rows != 1 {
+		t.Errorf("result[0].Rows must be 1 %v", r)
+	}
+	if r[1].Rows != 1 {
+		t.Errorf("result[1].Rows must be 1 %v", r)
+	}
 }
