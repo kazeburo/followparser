@@ -28,6 +28,7 @@ type Parser struct {
 	WorkDir     string
 	MaxReadSize int64
 	Callback    Callback
+	Silent      bool
 }
 
 type Parsed struct {
@@ -85,7 +86,9 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 		result = append(result, *parsed)
 	} else {
 		// rotate found
-		log.Printf("Detect Rotate")
+		if !parser.Silent {
+			log.Printf("Detect Rotate")
+		}
 		lastFile, err := lastFstat.searchFileByInode(filepath.Dir(logFile))
 		if err != nil {
 			log.Printf("Could not search previous file :%v", err)
@@ -136,9 +139,9 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Pa
 	if err != nil {
 		return nil, fmt.Errorf("failed to inode of log file: %v", err)
 	}
-
-	log.Printf("Analysis start logFile:%s lastPos:%d Size:%d", logFile, lastPos, fstat.Size)
-
+	if !parser.Silent {
+		log.Printf("Analysis start logFile:%s lastPos:%d Size:%d", logFile, lastPos, fstat.Size)
+	}
 	if lastPos == 0 && fstat.Size > parser.MaxReadSize {
 		// first time and big logfile
 		lastPos = fstat.Size
@@ -189,7 +192,9 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Pa
 		EndPos:   fpr.Pos,
 		Rows:     total,
 	}
-	log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
+	if !parser.Silent {
+		log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
+	}
 
 	return parsed, nil
 }
