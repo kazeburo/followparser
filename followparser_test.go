@@ -85,6 +85,7 @@ func TestParse(t *testing.T) {
 	fp := &Parser{
 		WorkDir:  tmpdir,
 		Callback: parser,
+		Silent:   true,
 	}
 	r, err := fp.Parse("logPos", logFileName)
 	if err != nil {
