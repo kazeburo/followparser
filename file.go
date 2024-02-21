@@ -3,11 +3,12 @@ package followparser
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/avast/retry-go"
 )
 
 type fPos struct {
@@ -37,12 +38,24 @@ func (pf *posFile) read() (int64, float64, *fStat, error) {
 		return 0, 0, nil, nil
 	}
 
-	d, err := ioutil.ReadFile(pf.filename)
-	if err != nil {
-		return 0, 0, nil, err
-	}
 	fp := fPos{}
-	err = json.Unmarshal(d, &fp)
+	err = retry.Do(
+		func() error {
+			d, err := os.ReadFile(pf.filename)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(d, &fp)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		retry.Attempts(3),
+		retry.DelayType(retry.FixedDelay),
+		retry.Delay(100*time.Millisecond),
+	)
+
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -74,7 +87,10 @@ func (pf *posFile) write(pos int64, fstat *fStat) error {
 		return err
 	}
 	_, err = file.Write(jb)
-	return err
+	if err != nil {
+		return err
+	}
+	return file.Sync()
 
 }
 
@@ -102,7 +118,7 @@ func (fstat *fStat) isNotRotated(lastFstat *fStat) bool {
 }
 
 func (fstat *fStat) searchFileByInode(d string) (string, error) {
-	files, err := ioutil.ReadDir(d)
+	files, err := os.ReadDir(d)
 	if err != nil {
 		return "", err
 	}
