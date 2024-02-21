@@ -2,7 +2,7 @@ ifdef update
   u=-u
 endif
 
-VERSION=0.2.1
+VERSION=0.2.2
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 GO111MODULE=on
 
