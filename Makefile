@@ -13,3 +13,4 @@ tag:
 
 check:
 	go test -v .
+	go test -race
