@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 )
 
 type fPos struct {
