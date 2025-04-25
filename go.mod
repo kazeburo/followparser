@@ -1,5 +1,5 @@
 module github.com/kazeburo/followparser
 
-go 1.13
+go 1.23.4
 
-require github.com/avast/retry-go v3.0.0+incompatible // indirect
+require github.com/avast/retry-go/v4 v4.6.1
