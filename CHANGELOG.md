@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.2.4](https://github.com/kazeburo/followparser/compare/v0.2.3...v0.2.4) - 2025-05-02
+- add NoAutoCommitPosFile option to commit manually by @kazeburo in https://github.com/kazeburo/followparser/pull/9
+
 ## [v0.2.3](https://github.com/kazeburo/followparser/compare/v0.2.2...v0.2.3) - 2025-04-25
 - use tagpr and update deps by @kazeburo in https://github.com/kazeburo/followparser/pull/7
 
