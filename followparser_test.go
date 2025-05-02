@@ -108,3 +108,83 @@ func TestParse(t *testing.T) {
 		t.Errorf("result[1].Rows must be 1 %v", r)
 	}
 }
+
+func TestParseWithNoCommitPosFile(t *testing.T) {
+	tmpdir := t.TempDir()
+	logFileName := filepath.Join(tmpdir, "log")
+	fh, err := os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+
+	lastmsg := ""
+	var fp *Parser
+	for i := 0; i < 2; i++ {
+		buf := bytes.NewBufferString("")
+		parser := &testParser{
+			buf:      buf,
+			duration: 0,
+		}
+		msg := fmt.Sprintf("msg msg %08d\n", i)
+		lastmsg += msg
+		fh.WriteString(msg)
+		fp = &Parser{
+			WorkDir:             tmpdir,
+			Callback:            parser,
+			NoAutoCommitPosFile: true,
+		}
+		r, err := fp.Parse("logPos", logFileName)
+		if err != nil {
+			t.Error(err)
+		}
+		out := parser.Slurp().String()
+		if out != lastmsg {
+			t.Errorf("read '%s' not match expect '%s'", out, lastmsg)
+		}
+		if len(r) != 1 {
+			t.Errorf("result len must be 1 %v", len(r))
+		}
+		if r[0].Rows != i+1 {
+			t.Errorf("result[0].Rows must be i+1 %v i=%d", r[0].Rows, i)
+		}
+		if r[0].EndPos-r[0].StartPos != int64(17*(i+1)) {
+			t.Errorf("r[0].EndPos - r[0].StartPos must be 17*(i+1) %v i=%d", r[0].EndPos-r[0].StartPos, i)
+		}
+	}
+	errCommit := fp.CommitPosFile()
+	if errCommit != nil {
+		t.Error(errCommit)
+	}
+	{
+		buf := bytes.NewBufferString("")
+		parser := &testParser{
+			buf:      buf,
+			duration: 0,
+		}
+		msg3 := fmt.Sprintf("msg msg %08d\n", 3)
+		fh.WriteString(msg3)
+		fp = &Parser{
+			WorkDir:             tmpdir,
+			Callback:            parser,
+			NoAutoCommitPosFile: false,
+		}
+		r, err := fp.Parse("logPos", logFileName)
+		if err != nil {
+			t.Error(err)
+		}
+		out := parser.Slurp().String()
+		if out != msg3 {
+			t.Errorf("read '%s' not match expect '%s'", out, msg3)
+		}
+		if len(r) != 1 {
+			t.Errorf("result len must be 1 %v", len(r))
+		}
+		if r[0].Rows != 1 {
+			t.Errorf("result[0].Rows must be 1 %v", r[0].Rows)
+		}
+		if r[0].EndPos-r[0].StartPos != 17 {
+			t.Errorf("r[0].EndPos - r[0].StartPos must be 17 %v", r[0].EndPos-r[0].StartPos)
+		}
+
+	}
+}
