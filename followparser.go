@@ -19,16 +19,23 @@ var maxBufSize = 5 * 1000 * 1000
 // DefaultMaxReadSize : Maximum size for read
 var DefaultMaxReadSize int64 = 500 * 1000 * 1000
 
+const newestLog = true
+const rotatedLog = false
+
 type Callback interface {
 	Parse(b []byte) error
 	Finish(duration float64)
 }
 
 type Parser struct {
-	WorkDir     string
-	MaxReadSize int64
-	Callback    Callback
-	Silent      bool
+	WorkDir             string
+	MaxReadSize         int64
+	Callback            Callback
+	Silent              bool
+	NoAutoCommitPosFile bool
+	posFile             *posFile
+	lastPos             int64
+	lastfStat           *fStat
 }
 
 type Parsed struct {
@@ -63,8 +70,8 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 		uid = curUser.Uid
 	}
 
-	pf := newPosFile(filepath.Join(parser.WorkDir, fmt.Sprintf("%s-%s", posFileName, uid)))
-	lastPos, duration, lastFstat, err := pf.read()
+	parser.posFile = newPosFile(filepath.Join(parser.WorkDir, fmt.Sprintf("%s-%s", posFileName, uid)))
+	lastPos, duration, lastFstat, err := parser.posFile.read()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load pos file :%v", err)
 	}
@@ -78,7 +85,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 		parsed, err := parser.parseFile(
 			logFile,
 			lastPos,
-			pf,
+			newestLog,
 		)
 		if err != nil {
 			return nil, err
@@ -96,7 +103,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err := parser.parseFile(
 				logFile,
 				0, // lastPos
-				pf,
+				newestLog,
 			)
 			if err != nil {
 				return nil, err
@@ -107,7 +114,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err := parser.parseFile(
 				lastFile,
 				lastPos,
-				nil, // no update posfile
+				rotatedLog, // no update posfile
 			)
 			if err != nil {
 				log.Printf("Could not parse previous file :%v", err)
@@ -119,7 +126,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err = parser.parseFile(
 				logFile,
 				0, // lastPos
-				pf,
+				newestLog,
 			)
 			if err != nil {
 				return nil, err
@@ -133,7 +140,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	return result, nil
 }
 
-func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Parsed, error) {
+func (parser *Parser) parseFile(logFile string, lastPos int64, newestLog bool) (*Parsed, error) {
 
 	fstat, err := fileStat(logFile)
 	if err != nil {
@@ -178,10 +185,14 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Pa
 	}
 
 	// update postion
-	if pf != nil {
-		err = pf.write(fpr.Pos, fstat)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update pos file :%v", err)
+	if newestLog {
+		parser.lastPos = fpr.Pos
+		parser.lastfStat = fstat
+		if !parser.NoAutoCommitPosFile {
+			err = parser.posFile.write(fpr.Pos, fstat)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update pos file :%v", err)
+			}
 		}
 	}
 
@@ -197,6 +208,17 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, pf *posFile) (*Pa
 	}
 
 	return parsed, nil
+}
+
+func (parser *Parser) CommitPosFile() error {
+	if parser.posFile == nil {
+		return nil
+	}
+	err := parser.posFile.write(parser.lastPos, parser.lastfStat)
+	if err != nil {
+		return fmt.Errorf("failed to update pos file :%v", err)
+	}
+	return nil
 }
 
 func (parser *Parser) parseLog(bs *bufio.Scanner) (int, error) {
