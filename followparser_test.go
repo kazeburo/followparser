@@ -151,9 +151,9 @@ func TestParseWithNoCommitPosFile(t *testing.T) {
 			t.Errorf("r[0].EndPos - r[0].StartPos must be 17*(i+1) %v i=%d", r[0].EndPos-r[0].StartPos, i)
 		}
 	}
-	fp.CommitPosFile()
-	if err != nil {
-		t.Error(err)
+	errCommit := fp.CommitPosFile()
+	if errCommit != nil {
+		t.Error(errCommit)
 	}
 	{
 		buf := bytes.NewBufferString("")
