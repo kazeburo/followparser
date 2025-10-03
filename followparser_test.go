@@ -108,7 +108,7 @@ func TestParse(t *testing.T) {
 		t.Errorf("result[1].Rows must be 1 %v", r)
 	}
 
-	// --- ここからアーカイブディレクトリへの移動テスト ---
+	// --- Archive directory move test starts here ---
 	archiveDir := filepath.Join(tmpdir, "archive")
 	err = os.Mkdir(archiveDir, 0755)
 	if err != nil {
