@@ -33,6 +33,7 @@ type Parser struct {
 	Callback            Callback
 	Silent              bool
 	NoAutoCommitPosFile bool
+	ArchiveDir          string
 	posFile             *posFile
 	lastPos             int64
 	lastfStat           *fStat
@@ -63,6 +64,9 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	}
 	if parser.Callback == nil {
 		parser.Callback = &dummyParser{}
+	}
+	if parser.ArchiveDir == "" {
+		parser.ArchiveDir = filepath.Dir(logFile)
 	}
 	curUser, _ := user.Current()
 	uid := "0"
@@ -96,7 +100,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 		if !parser.Silent {
 			log.Printf("Detect Rotate")
 		}
-		lastFile, err := lastFstat.searchFileByInode(filepath.Dir(logFile))
+		lastFile, err := lastFstat.searchFileByInode(parser.ArchiveDir)
 		if err != nil {
 			log.Printf("Could not search previous file :%v", err)
 			// new file only
