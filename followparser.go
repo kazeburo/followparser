@@ -65,6 +65,8 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	if parser.Callback == nil {
 		parser.Callback = &dummyParser{}
 	}
+	// If ArchiveDir is not set, default to the directory containing the log file.
+	// This fallback ensures archived logs are stored alongside the original log by default.
 	if parser.ArchiveDir == "" {
 		parser.ArchiveDir = filepath.Dir(logFile)
 	}
