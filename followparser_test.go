@@ -154,7 +154,7 @@ func TestParse(t *testing.T) {
 	}
 	out = parser.Slurp().String()
 	if out != msg5+msg6 {
-		t.Errorf("archive追従 read '%s' not match expect '%s'", out, msg5+msg6)
+		t.Errorf("archive follow read '%s' not match expect '%s'", out, msg5+msg6)
 	}
 	if len(r) != 2 {
 		t.Errorf("archive追従 result len must be 2 %v", r)
