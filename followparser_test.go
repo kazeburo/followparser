@@ -114,7 +114,7 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// ログファイルに追記
+	// Append to the log file
 	fh.Close()
 	fh, err = os.OpenFile(logFileName, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
