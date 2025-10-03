@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.5](https://github.com/kazeburo/followparser/compare/v0.2.4...v0.2.5) - 2025-10-03
+- pin actions commithash by @kazeburo in https://github.com/kazeburo/followparser/pull/11
+- find rotated files in dir by @kazeburo in https://github.com/kazeburo/followparser/pull/13
+
 ## [v0.2.4](https://github.com/kazeburo/followparser/compare/v0.2.3...v0.2.4) - 2025-05-02
 - add NoAutoCommitPosFile option to commit manually by @kazeburo in https://github.com/kazeburo/followparser/pull/9
 
