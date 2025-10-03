@@ -123,7 +123,7 @@ func TestParse(t *testing.T) {
 	msg5 := fmt.Sprintf("msg msg %08d\n", 5)
 	fh.WriteString(msg5)
 	fh.Close()
-	// logファイルをarchiveディレクトリに移動
+	// Move log file to archive directory
 	archivedLog := filepath.Join(archiveDir, "log.2")
 	err = os.Rename(logFileName, archivedLog)
 	if err != nil {
