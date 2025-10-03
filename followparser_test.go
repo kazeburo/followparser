@@ -157,13 +157,13 @@ func TestParse(t *testing.T) {
 		t.Errorf("archive follow read '%s' not match expect '%s'", out, msg5+msg6)
 	}
 	if len(r) != 2 {
-		t.Errorf("archive追従 result len must be 2 %v", r)
+		t.Errorf("archive follow result len must be 2 %v", r)
 	}
 	if r[0].Rows != 1 {
-		t.Errorf("archive追従 result[0].Rows must be 1 %v", r[0].Rows)
+		t.Errorf("archive follow result[0].Rows must be 1 %v", r[0].Rows)
 	}
 	if r[1].Rows != 1 {
-		t.Errorf("archive追従 result[1].Rows must be 1 %v", r[1].Rows)
+		t.Errorf("archive follow result[1].Rows must be 1 %v", r[1].Rows)
 	}
 }
 
