@@ -129,7 +129,7 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// 新しいlogファイルを作成し追記
+	// Create a new log file and write to it
 	fh, err = os.Create(logFileName)
 	if err != nil {
 		t.Error(err)
