@@ -107,6 +107,64 @@ func TestParse(t *testing.T) {
 	if r[1].Rows != 1 {
 		t.Errorf("result[1].Rows must be 1 %v", r)
 	}
+
+	// --- Archive directory move test starts here ---
+	archiveDir := filepath.Join(tmpdir, "archive")
+	err = os.Mkdir(archiveDir, 0755)
+	if err != nil {
+		t.Error(err)
+	}
+	// Append to the log file
+	fh.Close()
+	fh, err = os.OpenFile(logFileName, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Error(err)
+	}
+	msg5 := fmt.Sprintf("msg msg %08d\n", 5)
+	fh.WriteString(msg5)
+	fh.Close()
+	// Move log file to archive directory
+	archivedLog := filepath.Join(archiveDir, "log.2")
+	err = os.Rename(logFileName, archivedLog)
+	if err != nil {
+		t.Error(err)
+	}
+	// Create a new log file and write to it
+	fh, err = os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	msg6 := fmt.Sprintf("msg msg %08d\n", 6)
+	fh.WriteString(msg6)
+	fh.Close()
+	buf = bytes.NewBufferString("")
+	parser = &testParser{
+		buf:      buf,
+		duration: 0,
+	}
+	fp = &Parser{
+		WorkDir:    tmpdir,
+		Callback:   parser,
+		ArchiveDir: archiveDir,
+		Silent:     true,
+	}
+	r, err = fp.Parse("logPos", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	out = parser.Slurp().String()
+	if out != msg5+msg6 {
+		t.Errorf("archive follow read '%s' not match expect '%s'", out, msg5+msg6)
+	}
+	if len(r) != 2 {
+		t.Errorf("archive follow result len must be 2 %v", r)
+	}
+	if r[0].Rows != 1 {
+		t.Errorf("archive follow result[0].Rows must be 1 %v", r[0].Rows)
+	}
+	if r[1].Rows != 1 {
+		t.Errorf("archive follow result[1].Rows must be 1 %v", r[1].Rows)
+	}
 }
 
 func TestParseWithNoCommitPosFile(t *testing.T) {
