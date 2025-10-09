@@ -1,7 +1,8 @@
 package followparser
 
 import (
-	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,17 +11,14 @@ import (
 	"path/filepath"
 )
 
-// initialBufSize for bufio
-var initialBufSize = 10000
+// initialBufSize for scanFile
+var initialBufSize = 32 * 1000
 
-// maxBufSize for bufio default 65537
+// maxBufSize for scanFile
 var maxBufSize = 5 * 1000 * 1000
 
 // DefaultMaxReadSize : Maximum size for read
 var DefaultMaxReadSize int64 = 500 * 1000 * 1000
-
-const newestLog = true
-const rotatedLog = false
 
 type Callback interface {
 	Parse(b []byte) error
@@ -91,7 +89,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 		parsed, err := parser.parseFile(
 			logFile,
 			lastPos,
-			newestLog,
+			true,
 		)
 		if err != nil {
 			return nil, err
@@ -109,7 +107,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err := parser.parseFile(
 				logFile,
 				0, // lastPos
-				newestLog,
+				true,
 			)
 			if err != nil {
 				return nil, err
@@ -120,7 +118,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err := parser.parseFile(
 				lastFile,
 				lastPos,
-				rotatedLog, // no update posfile
+				false, // no update posfile
 			)
 			if err != nil {
 				log.Printf("Could not parse previous file :%v", err)
@@ -132,7 +130,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 			parsed, err = parser.parseFile(
 				logFile,
 				0, // lastPos
-				newestLog,
+				true,
 			)
 			if err != nil {
 				return nil, err
@@ -146,7 +144,17 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	return result, nil
 }
 
-func (parser *Parser) parseFile(logFile string, lastPos int64, newestLog bool) (*Parsed, error) {
+func seekToPos(f io.Reader, pos int64) error {
+	if is, ok := f.(io.Seeker); ok {
+		_, err := is.Seek(pos, 0)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (parser *Parser) parseFile(logFile string, lastPos int64, newest bool) (*Parsed, error) {
 
 	fstat, err := fileStat(logFile)
 	if err != nil {
@@ -170,32 +178,23 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, newestLog bool) (
 		return nil, fmt.Errorf("failed to open log file :%v", err)
 	}
 	defer f.Close()
-	fpr, err := newReader(f, lastPos)
+	err = seekToPos(f, lastPos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seek log file :%v", err)
 	}
 
-	total := 0
-	bs := bufio.NewScanner(fpr)
-	bs.Buffer(make([]byte, initialBufSize), maxBufSize)
-	for {
-		scan, e := parser.parseLog(bs)
-		total += scan
-		if e == io.EOF {
-			break
-		}
-		if e != nil {
-			return nil, fmt.Errorf("something wrong in parse log :%v", e)
-		}
-
+	rows, read, err := parser.scanFile(f, newest)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("something wrong in parse log :%v", err)
 	}
+	curPos := lastPos + read
 
 	// update postion
-	if newestLog {
-		parser.lastPos = fpr.Pos
+	if newest {
+		parser.lastPos = curPos
 		parser.lastfStat = fstat
 		if !parser.NoAutoCommitPosFile {
-			err = parser.posFile.write(fpr.Pos, fstat)
+			err = parser.posFile.write(curPos, fstat)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update pos file :%v", err)
 			}
@@ -206,11 +205,11 @@ func (parser *Parser) parseFile(logFile string, lastPos int64, newestLog bool) (
 		FileName: logFile,
 		Size:     fstat.Size,
 		StartPos: lastPos,
-		EndPos:   fpr.Pos,
-		Rows:     total,
+		EndPos:   curPos,
+		Rows:     rows,
 	}
 	if !parser.Silent {
-		log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, fpr.Pos, total)
+		log.Printf("Analysis completed logFile:%s startPos:%d endPos:%d Rows:%d", logFile, lastPos, curPos, rows)
 	}
 
 	return parsed, nil
@@ -227,18 +226,62 @@ func (parser *Parser) CommitPosFile() error {
 	return nil
 }
 
-func (parser *Parser) parseLog(bs *bufio.Scanner) (int, error) {
+func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 	scan := 0
-	for bs.Scan() {
-		b := bs.Bytes()
-		err := parser.Callback.Parse(b)
+	read := int64(0)
+	buf := make([]byte, initialBufSize)
+	offset := 0
+	for {
+		n, err := f.Read(buf[offset:])
 		if err != nil {
-			log.Printf("Failed to parse log :%v", err)
+			return scan, read, err
 		}
-		scan++
+
+		n += offset
+		if bytes.IndexByte(buf[:n], '\n') < 0 {
+			if n == maxBufSize {
+				// buffer full
+				return scan, read, errors.New("reader: token too long")
+			} else if n == len(buf) {
+				// buffer full and to expand buffer
+				newSize := len(buf) * 2
+				newSize = min(newSize, maxBufSize)
+				newBuf := make([]byte, newSize)
+				copy(newBuf, buf)
+				buf = newBuf
+			} else if !newest {
+				// no newline but not full buffer and not newest file
+				// treat as end of file
+				read += int64(n)
+				err := parser.Callback.Parse(buf[0:n])
+				if err != nil {
+					log.Printf("Failed to parse log :%v", err)
+				}
+				scan++
+				return scan, read, io.EOF
+
+			}
+			// continue to read
+			offset = n
+			continue
+		}
+
+		k := 0
+		for i := bytes.IndexByte(buf[k:n], '\n'); i >= 0; i = bytes.IndexByte(buf[k:n], '\n') {
+			read += int64(i + 1) // +1 for newline
+			err := parser.Callback.Parse(buf[k : k+i])
+			if err != nil {
+				log.Printf("Failed to parse log :%v", err)
+			}
+			scan++
+			k = k + i + 1
+		}
+		if k < n {
+			// move remaining to head
+			copy(buf[0:], buf[k:n])
+			offset = n - k
+		} else {
+			offset = 0
+		}
 	}
-	if bs.Err() != nil {
-		return scan, bs.Err()
-	}
-	return scan, io.EOF
 }
