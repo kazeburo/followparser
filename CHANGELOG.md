@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.2.6](https://github.com/kazeburo/followparser/compare/v0.2.5...v0.2.6) - 2025-10-09
+- new no tailing newline logs by @kazeburo in https://github.com/kazeburo/followparser/pull/14
+
 ## [v0.2.5](https://github.com/kazeburo/followparser/compare/v0.2.4...v0.2.5) - 2025-10-03
 - pin actions commithash by @kazeburo in https://github.com/kazeburo/followparser/pull/11
 - find rotated files in dir by @kazeburo in https://github.com/kazeburo/followparser/pull/13
