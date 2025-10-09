@@ -241,7 +241,7 @@ func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 		if bytes.IndexByte(buf[:n], '\n') < 0 {
 			if n == maxBufSize {
 				// buffer full
-				return scan, read, errors.New("reader: token too Long")
+				return scan, read, errors.New("reader: token too long")
 			} else if n == len(buf) {
 				// buffer full and to expand buffer
 				newSize := len(buf) * 2
