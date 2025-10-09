@@ -246,3 +246,195 @@ func TestParseWithNoCommitPosFile(t *testing.T) {
 
 	}
 }
+
+// Test when the last line in the log file does not end with a newline,
+// then the file is appended to. Ensure appended content is followed.
+func TestParseAppendAfterNoTrailingNewline(t *testing.T) {
+	tmpdir := t.TempDir()
+	logFileName := filepath.Join(tmpdir, "log")
+	fh, err := os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// write a line without a trailing newline
+	previousMsg := fmt.Sprintf("msg msg %08d\n", 7)
+	previousMsg += fmt.Sprintf("msg msg %08d\n", 8)
+	previousMsg += fmt.Sprintf("msg msg %08d\n", 9)
+	msgNoNLBefore := "msg "
+	_, err = fh.WriteString(previousMsg + msgNoNLBefore)
+	if err != nil {
+		t.Error(err)
+	}
+	fh.Sync()
+
+	// First parse: should read the existing line (even without newline)
+	buf := bytes.NewBufferString("")
+	parser := &testParser{buf: buf}
+	fp := &Parser{
+		WorkDir:  tmpdir,
+		Callback: parser,
+		Silent:   true,
+	}
+	r, err := fp.Parse("logPosNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	out := parser.Slurp().String()
+	if out != previousMsg {
+		t.Fatalf("first read '%s' not match expect '%s'", out, previousMsg)
+	}
+	if len(r) != 1 {
+		t.Fatalf("first result len must be 1 %v", r)
+	}
+
+	// Append new content (with newline) to the same file
+	fh, err = os.OpenFile(logFileName, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Error(err)
+	}
+	msgNoNLAfter := fmt.Sprintf("msg %08d\n", 10)
+	msgAppend := fmt.Sprintf("msg msg %08d\n", 11)
+	_, err = fh.WriteString(msgNoNLAfter + msgAppend)
+	if err != nil {
+		t.Error(err)
+	}
+	fh.Close()
+
+	// Second parse using same pos file name: should read only appended content
+	buf2 := bytes.NewBufferString("")
+	parser2 := &testParser{buf: buf2}
+	fp2 := &Parser{
+		WorkDir:  tmpdir,
+		Callback: parser2,
+		Silent:   true,
+	}
+	r2, err := fp2.Parse("logPosNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	out2 := parser2.Slurp().String()
+	if out2 != msgNoNLBefore+msgNoNLAfter+msgAppend {
+		t.Fatalf("second read '%s' not match expect '%s'", out2, msgNoNLBefore+msgNoNLAfter+msgAppend)
+	}
+	if len(r2) != 1 {
+		t.Fatalf("second result len must be 1 %v", r2)
+	}
+}
+
+// Test a single line longer than initialBufSize is read properly
+func TestParseSingleLongLine(t *testing.T) {
+	tmpdir := t.TempDir()
+	logFileName := filepath.Join(tmpdir, "log")
+	fh, err := os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	// create a single long line > initialBufSize
+	longLen := initialBufSize + 100
+	data := bytes.Repeat([]byte("A"), longLen)
+	// ensure newline at end so Scanner treats it as a line
+	_, err = fh.Write(data)
+	if err != nil {
+		t.Error(err)
+	}
+	fh.WriteString("\n")
+	fh.Close()
+
+	buf := bytes.NewBufferString("")
+	parser := &testParser{buf: buf}
+	fp := &Parser{
+		WorkDir:  tmpdir,
+		Callback: parser,
+		Silent:   true,
+	}
+	r, err := fp.Parse("logPosLong", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	out := parser.Slurp().String()
+	expected := string(data) + "\n"
+	if out != expected {
+		t.Fatalf("read length %d not match expect %d", len(out), len(expected))
+	}
+	if len(r) != 1 {
+		t.Fatalf("result len must be 1 %v", r)
+	}
+	if r[0].Rows != 1 {
+		t.Fatalf("result[0].Rows must be 1 %v", r[0].Rows)
+	}
+	if r[0].EndPos-r[0].StartPos != int64(len(expected)) {
+		t.Fatalf("r[0].EndPos - r[0].StartPos must be %d %v", len(expected), r[0])
+	}
+}
+
+// Test rotate: old (archived) file's last line has no trailing newline
+// and should still be read after rotation.
+func TestRotateReadOldFileWithNoTrailingNewline(t *testing.T) {
+	tmpdir := t.TempDir()
+	logFileName := filepath.Join(tmpdir, "log")
+	fh, err := os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	// write first line with newline and parse to set pos file
+	msg1 := fmt.Sprintf("msg msg %08d\n", 30)
+	fh.WriteString(msg1)
+	fh.Sync()
+
+	buf := bytes.NewBufferString("")
+	parser := &testParser{buf: buf}
+	fp := &Parser{WorkDir: tmpdir, Callback: parser, Silent: true}
+	r, err := fp.Parse("logPosRotateNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(r) != 1 {
+		t.Fatalf("initial parse result len must be 1 %v", r)
+	}
+
+	// append a line WITHOUT trailing newline
+	msg2 := fmt.Sprintf("msg msg %08d", 31)
+	fh, err = os.OpenFile(logFileName, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Error(err)
+	}
+	fh.WriteString(msg2)
+	fh.Close()
+
+	// rotate the log (rename to archive)
+	archived := filepath.Join(tmpdir, "log.1")
+	err = os.Rename(logFileName, archived)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// create a new log file and write another line
+	fh, err = os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	msg3 := fmt.Sprintf("msg msg %08d\n", 32)
+	fh.WriteString(msg3)
+	fh.Close()
+
+	// parse again: it should find the archived file and read msg2 (no newline)
+	buf2 := bytes.NewBufferString("")
+	parser2 := &testParser{buf: buf2}
+	fp2 := &Parser{WorkDir: tmpdir, Callback: parser2, Silent: true}
+	r2, err := fp2.Parse("logPosRotateNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	out := parser2.Slurp().String()
+	expected := msg2 + "\n" + msg3
+	if out != expected {
+		t.Fatalf("rotate read '%s' not match expect '%s'", out, expected)
+	}
+	if len(r2) != 2 {
+		t.Fatalf("rotate result len must be 2 %v", r2)
+	}
+	if r2[0].Rows != 1 || r2[1].Rows != 1 {
+		t.Fatalf("rotate rows must be 1 each %v", r2)
+	}
+}
