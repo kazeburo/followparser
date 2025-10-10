@@ -38,7 +38,7 @@ func benchScannerFile(b *testing.B, fname string) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		parser := &testParser{buf: bytes.NewBufferString("")}
+		parser := &dummyParser{}
 		scanner := bufio.NewScanner(fh)
 		scanner.Buffer(make([]byte, initialBufSize), maxBufSize)
 		for scanner.Scan() {
@@ -55,12 +55,13 @@ func benchScannerFile(b *testing.B, fname string) {
 
 func benchScanFile(b *testing.B, fname string) {
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		fh, err := os.Open(fname)
 		if err != nil {
 			b.Fatal(err)
 		}
-		parser := &testParser{buf: bytes.NewBufferString("")}
+		parser := &dummyParser{}
 		p := &Parser{Callback: parser}
 		_, _, err = p.scanFile(fh, true)
 		if err != nil && err != io.EOF {
