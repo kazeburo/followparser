@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.7](https://github.com/kazeburo/followparser/compare/v0.2.6...v0.2.7) - 2025-10-10
+- improve readme by @kazeburo in https://github.com/kazeburo/followparser/pull/16
+- optimize scan and add benchmark by @kazeburo in https://github.com/kazeburo/followparser/pull/18
+
 ## [v0.2.6](https://github.com/kazeburo/followparser/compare/v0.2.5...v0.2.6) - 2025-10-09
 - new no tailing newline logs by @kazeburo in https://github.com/kazeburo/followparser/pull/14
 
