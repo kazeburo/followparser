@@ -20,6 +20,8 @@ var maxBufSize = 5 * 1000 * 1000
 // DefaultMaxReadSize : Maximum size for read
 var DefaultMaxReadSize int64 = 500 * 1000 * 1000
 
+var ErrTokenTooLong = errors.New("reader: token too long")
+
 type Callback interface {
 	Parse(b []byte) error
 	Finish(duration float64)
@@ -232,56 +234,90 @@ func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 	buf := make([]byte, initialBufSize)
 	offset := 0
 	for {
-		n, err := f.Read(buf[offset:])
+		nRead, err := f.Read(buf[offset:])
+		eof := false
 		if err != nil {
-			return scan, read, err
-		}
-
-		n += offset
-		if bytes.IndexByte(buf[:n], '\n') < 0 {
-			if n == maxBufSize {
-				// buffer full
-				return scan, read, errors.New("reader: token too long")
-			} else if n == len(buf) {
-				// buffer full and to expand buffer
-				newSize := len(buf) * 2
-				newSize = min(newSize, maxBufSize)
-				newBuf := make([]byte, newSize)
-				copy(newBuf, buf)
-				buf = newBuf
-			} else if !newest {
-				// no newline but not full buffer and not newest file
-				// treat as end of file
-				read += int64(n)
-				err := parser.Callback.Parse(buf[0:n])
-				if err != nil {
-					log.Printf("Failed to parse log :%v", err)
-				}
-				scan++
-				return scan, read, io.EOF
-
+			if err == io.EOF {
+				eof = true
+			} else {
+				return scan, read, err
 			}
-			// continue to read
-			offset = n
-			continue
 		}
 
+		if nRead == 0 && eof {
+			// nothing more to read on this read call; if we have a leftover partial line
+			// in the buffer (offset > 0), process it according to the 'newest' flag.
+			if offset > 0 {
+				if !newest {
+					read += int64(offset)
+					if err := parser.Callback.Parse(buf[0:offset]); err != nil {
+						log.Printf("Failed to parse log :%v", err)
+					}
+					scan++
+				}
+			}
+			return scan, read, io.EOF
+		}
+
+		n := nRead + offset
+
+		// scan lines within buf[0:n]
 		k := 0
-		for i := bytes.IndexByte(buf[k:n], '\n'); i >= 0; i = bytes.IndexByte(buf[k:n], '\n') {
-			read += int64(i + 1) // +1 for newline
-			err := parser.Callback.Parse(buf[k : k+i])
-			if err != nil {
+		for {
+			idx := bytes.IndexByte(buf[k:n], '\n')
+			if idx < 0 {
+				break
+			}
+			// found newline at k+idx
+			read += int64(idx + 1)
+			if err := parser.Callback.Parse(buf[k : k+idx]); err != nil {
 				log.Printf("Failed to parse log :%v", err)
 			}
 			scan++
-			k = k + i + 1
+			k += idx + 1
 		}
+
 		if k < n {
-			// move remaining to head
+			// remaining partial line in buffer
+			// move it to the head for next read
 			copy(buf[0:], buf[k:n])
 			offset = n - k
 		} else {
 			offset = 0
 		}
+
+		if eof {
+			// if file ended and there is a remaining partial line
+			if offset > 0 {
+				if !newest {
+					// for rotated/old files, parse the final partial line
+					read += int64(offset)
+					if err := parser.Callback.Parse(buf[0:offset]); err != nil {
+						log.Printf("Failed to parse log :%v", err)
+					}
+					scan++
+				}
+			}
+			return scan, read, io.EOF
+		}
+
+		// current buffer is full
+		if offset == n {
+			// buffer is maxsize
+			if n == maxBufSize {
+				return scan, read, ErrTokenTooLong
+			}
+			if n == len(buf) {
+				// expand buffer
+				newSize := len(buf) * 2
+				newSize = min(newSize, maxBufSize)
+				newBuf := make([]byte, newSize)
+				copy(newBuf, buf)
+				buf = newBuf
+			}
+			// continue reading into buffer at offset
+			continue
+		}
+		// otherwise there was at least one newline and possibly leftover, continue reading
 	}
 }
