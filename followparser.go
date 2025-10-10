@@ -302,6 +302,8 @@ func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 		}
 
 		// current buffer is full
+		// If offset == n, then no newlines were found in the current buffer,
+		// so the entire buffer is a partial line. Continue reading or expand the buffer.
 		if offset == n {
 			// buffer is maxsize
 			if n == maxBufSize {
