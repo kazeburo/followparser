@@ -1,8 +1,10 @@
 package followparser
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,107 @@ import (
 type testParser struct {
 	buf      *bytes.Buffer
 	duration float64
+}
+
+// Helper to write a test file with repeated lines
+func writeTestFile(path string, line string, count int) error {
+	fh, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+	for i := 0; i < count; i++ {
+		if _, err := fh.WriteString(line); err != nil {
+			return err
+		}
+	}
+	return fh.Sync()
+}
+
+func benchScannerFile(b *testing.B, fname string) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		fh, err := os.Open(fname)
+		if err != nil {
+			b.Fatal(err)
+		}
+		parser := &dummyParser{}
+		scanner := bufio.NewScanner(fh)
+		scanner.Buffer(make([]byte, initialBufSize), maxBufSize)
+		for scanner.Scan() {
+			if err := parser.Parse(scanner.Bytes()); err != nil {
+				b.Fatal(err)
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			b.Fatal(err)
+		}
+		fh.Close()
+	}
+}
+
+func benchScanFile(b *testing.B, fname string) {
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		fh, err := os.Open(fname)
+		if err != nil {
+			b.Fatal(err)
+		}
+		parser := &dummyParser{}
+		p := &Parser{Callback: parser}
+		_, _, err = p.scanFile(fh, true)
+		if err != nil && err != io.EOF {
+			b.Fatal(err)
+		}
+		fh.Close()
+	}
+}
+
+func BenchmarkScanner_SmallLines(b *testing.B) {
+	dir := b.TempDir()
+	fname := filepath.Join(dir, "small.log")
+	line := "short line example\n"
+	// ~10k lines
+	if err := writeTestFile(fname, line, 10000); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	benchScannerFile(b, fname)
+}
+
+func BenchmarkScanFile_SmallLines(b *testing.B) {
+	dir := b.TempDir()
+	fname := filepath.Join(dir, "small.log")
+	line := "short line example\n"
+	if err := writeTestFile(fname, line, 10000); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	benchScanFile(b, fname)
+}
+
+func BenchmarkScanner_LongLine(b *testing.B) {
+	dir := b.TempDir()
+	fname := filepath.Join(dir, "long.log")
+	longLine := string(bytes.Repeat([]byte("A"), initialBufSize+100)) + "\n"
+	// single long line
+	if err := writeTestFile(fname, longLine, 1); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	benchScannerFile(b, fname)
+}
+
+func BenchmarkScanFile_LongLine(b *testing.B) {
+	dir := b.TempDir()
+	fname := filepath.Join(dir, "long.log")
+	longLine := string(bytes.Repeat([]byte("A"), initialBufSize+100)) + "\n"
+	if err := writeTestFile(fname, longLine, 1); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	benchScanFile(b, fname)
 }
 
 func (p *testParser) Parse(b []byte) error {
