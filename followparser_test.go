@@ -40,7 +40,7 @@ func benchScannerFile(b *testing.B, fname string) {
 		}
 		parser := &dummyParser{}
 		scanner := bufio.NewScanner(fh)
-		scanner.Buffer(make([]byte, initialBufSize), maxBufSize)
+		scanner.Buffer(make([]byte, DefaultStartBufSize), DefaultMaxBufSize)
 		for scanner.Scan() {
 			if err := parser.Parse(scanner.Bytes()); err != nil {
 				b.Fatal(err)
@@ -62,7 +62,12 @@ func benchScanFile(b *testing.B, fname string) {
 			b.Fatal(err)
 		}
 		parser := &dummyParser{}
-		p := &Parser{Callback: parser}
+		p := &Parser{
+			Callback:     parser,
+			StartBufSize: DefaultStartBufSize,
+			MaxBufSize:   DefaultMaxBufSize,
+			MaxReadSize:  DefaultMaxReadSize,
+		}
 		_, _, err = p.scanFile(fh, true)
 		if err != nil && err != io.EOF {
 			b.Fatal(err)
@@ -97,7 +102,7 @@ func BenchmarkScanFile_SmallLines(b *testing.B) {
 func BenchmarkScanner_LongLine(b *testing.B) {
 	dir := b.TempDir()
 	fname := filepath.Join(dir, "long.log")
-	longLine := string(bytes.Repeat([]byte("A"), initialBufSize+100)) + "\n"
+	longLine := string(bytes.Repeat([]byte("A"), DefaultStartBufSize+100)) + "\n"
 	// single long line
 	if err := writeTestFile(fname, longLine, 1); err != nil {
 		b.Fatal(err)
@@ -109,7 +114,7 @@ func BenchmarkScanner_LongLine(b *testing.B) {
 func BenchmarkScanFile_LongLine(b *testing.B) {
 	dir := b.TempDir()
 	fname := filepath.Join(dir, "long.log")
-	longLine := string(bytes.Repeat([]byte("A"), initialBufSize+100)) + "\n"
+	longLine := string(bytes.Repeat([]byte("A"), DefaultStartBufSize+100)) + "\n"
 	if err := writeTestFile(fname, longLine, 1); err != nil {
 		b.Fatal(err)
 	}
@@ -425,7 +430,7 @@ func TestParseAppendAfterNoTrailingNewline(t *testing.T) {
 	}
 }
 
-// Test a single line longer than initialBufSize is read properly
+// Test a single line longer than DefaultStartBufSize is read properly
 func TestParseSingleLongLine(t *testing.T) {
 	tmpdir := t.TempDir()
 	logFileName := filepath.Join(tmpdir, "log")
@@ -433,8 +438,8 @@ func TestParseSingleLongLine(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// create a single long line > initialBufSize
-	longLen := initialBufSize + 100
+	// create a single long line > DefaultStartBufSize
+	longLen := DefaultStartBufSize + 100
 	data := bytes.Repeat([]byte("A"), longLen)
 	// ensure newline at end so Scanner treats it as a line
 	_, err = fh.Write(data)

@@ -11,16 +11,19 @@ import (
 	"path/filepath"
 )
 
-// initialBufSize for scanFile
-var initialBufSize = 32 * 1000
+var (
+	// DefaultStartBufSize for scanFile
+	DefaultStartBufSize = 32 * 1000
 
-// maxBufSize for scanFile
-var maxBufSize = 5 * 1000 * 1000
+	// DefaultMaxBufSize for scanFile
+	DefaultMaxBufSize = 5 * 1000 * 1000
 
-// DefaultMaxReadSize : Maximum size for read
-var DefaultMaxReadSize int64 = 500 * 1000 * 1000
+	// DefaultMaxReadSize : Maximum size for read
+	DefaultMaxReadSize int64 = 500 * 1000 * 1000
 
-var ErrTokenTooLong = errors.New("reader: token too long")
+	// ErrTokenTooLong is returned when a token exceeds the maximum allowed size
+	ErrTokenTooLong = errors.New("reader: token too long")
+)
 
 type Callback interface {
 	Parse(b []byte) error
@@ -30,6 +33,8 @@ type Callback interface {
 type Parser struct {
 	WorkDir             string
 	MaxReadSize         int64
+	StartBufSize        int
+	MaxBufSize          int
 	Callback            Callback
 	Silent              bool
 	NoAutoCommitPosFile bool
@@ -47,6 +52,14 @@ type Parsed struct {
 	Rows     int
 }
 
+// Parse creates a Parser and parses the specified log file using the provided position file and callback.
+// 
+// Parameters:
+//   posFileName - the path to the position file used to track parsing progress
+//   logFile     - the path to the log file to be parsed
+//   cb          - a Callback implementation to handle parsed data
+//
+// Returns an error if parsing fails.
 func Parse(posFileName, logFile string, cb Callback) error {
 	parser := &Parser{
 		Callback: cb,
@@ -58,6 +71,12 @@ func Parse(posFileName, logFile string, cb Callback) error {
 func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	if parser.WorkDir == "" {
 		parser.WorkDir = os.TempDir()
+	}
+	if parser.StartBufSize == 0 {
+		parser.StartBufSize = DefaultStartBufSize
+	}
+	if parser.MaxBufSize == 0 {
+		parser.MaxBufSize = DefaultMaxBufSize
 	}
 	if parser.MaxReadSize == 0 {
 		parser.MaxReadSize = DefaultMaxReadSize
@@ -231,7 +250,7 @@ func (parser *Parser) CommitPosFile() error {
 func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 	scan := 0
 	read := int64(0)
-	buf := make([]byte, initialBufSize)
+	buf := make([]byte, parser.StartBufSize)
 	offset := 0
 	for {
 		nRead, err := f.Read(buf[offset:])
@@ -306,13 +325,13 @@ func (parser *Parser) scanFile(f io.Reader, newest bool) (int, int64, error) {
 		// so the entire buffer is a partial line. Continue reading or expand the buffer.
 		if offset == n {
 			// buffer is maxsize
-			if n == maxBufSize {
+			if n == parser.MaxBufSize {
 				return scan, read, ErrTokenTooLong
 			}
 			if n == len(buf) {
 				// expand buffer
 				newSize := len(buf) * 2
-				newSize = min(newSize, maxBufSize)
+				newSize = min(newSize, parser.MaxBufSize)
 				newBuf := make([]byte, newSize)
 				copy(newBuf, buf)
 				buf = newBuf
