@@ -62,7 +62,12 @@ func benchScanFile(b *testing.B, fname string) {
 			b.Fatal(err)
 		}
 		parser := &dummyParser{}
-		p := &Parser{Callback: parser}
+		p := &Parser{
+			Callback:     parser,
+			StartBufSize: DefaultStartBufSize,
+			MaxBufSize:   DefaultMaxBufSize,
+			MaxReadSize:  DefaultMaxReadSize,
+		}
 		_, _, err = p.scanFile(fh, true)
 		if err != nil && err != io.EOF {
 			b.Fatal(err)
