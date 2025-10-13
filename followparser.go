@@ -23,7 +23,6 @@ var (
 
 	// ErrTokenTooLong is returned when a token exceeds the maximum allowed size
 	ErrTokenTooLong = errors.New("reader: token too long")
-
 )
 
 type Callback interface {
