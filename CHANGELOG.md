@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.2.8](https://github.com/kazeburo/followparser/compare/v0.2.7...v0.2.8) - 2025-10-13
+- make buffer-size customizable by @kazeburo in https://github.com/kazeburo/followparser/pull/19
+
 ## [v0.2.7](https://github.com/kazeburo/followparser/compare/v0.2.6...v0.2.7) - 2025-10-10
 - improve readme by @kazeburo in https://github.com/kazeburo/followparser/pull/16
 - optimize scan and add benchmark by @kazeburo in https://github.com/kazeburo/followparser/pull/18
