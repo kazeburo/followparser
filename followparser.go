@@ -24,8 +24,6 @@ var (
 	// ErrTokenTooLong is returned when a token exceeds the maximum allowed size
 	ErrTokenTooLong = errors.New("reader: token too long")
 
-	// ErrInvalidLogFormat is returned when the log format is invalid
-	ErrInvalidLogFormat = errors.New("reader: invalid log format")
 )
 
 type Callback interface {
