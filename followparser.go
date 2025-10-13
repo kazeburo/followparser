@@ -52,7 +52,14 @@ type Parsed struct {
 	Rows     int
 }
 
-// Parse is a convenience function to create a Parser and parse the log file.
+// Parse creates a Parser and parses the specified log file using the provided position file and callback.
+// 
+// Parameters:
+//   posFileName - the path to the position file used to track parsing progress
+//   logFile     - the path to the log file to be parsed
+//   cb          - a Callback implementation to handle parsed data
+//
+// Returns an error if parsing fails.
 func Parse(posFileName, logFile string, cb Callback) error {
 	parser := &Parser{
 		Callback: cb,
