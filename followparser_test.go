@@ -546,3 +546,69 @@ func TestRotateReadOldFileWithNoTrailingNewline(t *testing.T) {
 		t.Fatalf("rotate rows must be 1 each %v", r2)
 	}
 }
+
+func TestTruncated(t *testing.T) {
+	tmpdir := t.TempDir()
+	logFileName := filepath.Join(tmpdir, "truncate-log")
+	fh, err := os.Create(logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	// write initial lines
+	var lines = 10
+	for i := 0; i < lines; i++ {
+		msg := fmt.Sprintf("msg msg %08d\n", i)
+		fh.WriteString(msg)
+	}
+	fh.Sync()
+
+	buf := bytes.NewBufferString("")
+	parser := &testParser{buf: buf}
+	fp := &Parser{WorkDir: tmpdir, Callback: parser, Silent: true}
+	r, err := fp.Parse("logPosTruncateNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(r) != 1 {
+		t.Fatalf("initial parse result len must be %d %v", 1, r)
+	}
+	if r[0].Rows != lines {
+		t.Fatalf("initial parse result rows must be %d %v", lines, r[0].Rows)
+	}
+	fh.Close()
+
+	// truncate the log
+	if err = os.Truncate(logFileName, 0); err != nil {
+		t.Error(err)
+	}
+
+	// reopen and write a new line
+	fh, err = os.OpenFile(logFileName, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Error(err)
+	}
+	msg3 := fmt.Sprintf("msg msg %08d\n", 32)
+	fh.WriteString(msg3)
+	fh.Close()
+
+	// parse again: it should be truncated and read only the new line
+	buf2 := bytes.NewBufferString("")
+	parser2 := &testParser{buf: buf2}
+	fp2 := &Parser{WorkDir: tmpdir, Callback: parser2, Silent: false}
+	r2, err := fp2.Parse("logPosTruncateNoNL", logFileName)
+	if err != nil {
+		t.Error(err)
+	}
+
+	out := parser2.Slurp().String()
+	expected := msg3
+	if out != expected {
+		t.Fatalf("truncated read '%s' not match expect '%s'", out, expected)
+	}
+	if len(r2) != 1 {
+		t.Fatalf("truncated result len must be 1 %v", r2)
+	}
+	if r2[0].Rows != 1 {
+		t.Fatalf("truncated rows must be 1 each %v", r2)
+	}
+}

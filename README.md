@@ -16,12 +16,14 @@ followparser はログファイルを安定して追従・解析するための�
 - Correctly handle files where the last line does not end with a newline.
 - Configurable maximum read size and buffer behavior to handle large single-line logs.
 - Minimal, dependency-light implementation suitable for embedding in small tools.
+- If a file is truncated, it will continue reading from the beginning.
 
 - 前回の読み取り位置を posfile として保存し、再起動後も読み続けられます。
 - ログがローテートされた際に、inode によって過去ログを検索し追従できます。
 - 最後の行が改行で終わらない場合でも正しく処理します。
 - 単一行が大きいケースに対応するためのバッファ／読み取り上限設定を提供します。
 - 依存を最小限に抑えた実装で小さなツールへの組み込みに適しています。
+- ファイルが切り詰められた場合は、先頭からの読み取りを継続します。
 
 ## Quick usage / 使い方（簡単）
 
