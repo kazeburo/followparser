@@ -53,11 +53,12 @@ type Parsed struct {
 }
 
 // Parse creates a Parser and parses the specified log file using the provided position file and callback.
-// 
+//
 // Parameters:
-//   posFileName - the path to the position file used to track parsing progress
-//   logFile     - the path to the log file to be parsed
-//   cb          - a Callback implementation to handle parsed data
+//
+//	posFileName - the path to the position file used to track parsing progress
+//	logFile     - the path to the log file to be parsed
+//	cb          - a Callback implementation to handle parsed data
 //
 // Returns an error if parsing fails.
 func Parse(posFileName, logFile string, cb Callback) error {
@@ -107,6 +108,13 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	}
 	result := make([]Parsed, 0)
 	if fstat.isNotRotated(lastFstat) {
+		if fstat.Size < lastPos {
+			if !parser.Silent {
+				log.Println("Detect Truncate")
+			}
+			// file is truncated, reset lastPos
+			lastPos = 0
+		}
 		parsed, err := parser.parseFile(
 			logFile,
 			lastPos,
