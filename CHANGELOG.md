@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.2.9](https://github.com/kazeburo/followparser/compare/v0.2.8...v0.2.9) - 2025-10-20
+- If a file is truncated, it will continue reading from the beginning. by @fujiwara in https://github.com/kazeburo/followparser/pull/21
+
 ## [v0.2.8](https://github.com/kazeburo/followparser/compare/v0.2.7...v0.2.8) - 2025-10-13
 - make buffer-size customizable by @kazeburo in https://github.com/kazeburo/followparser/pull/19
 
