@@ -108,7 +108,7 @@ func (parser *Parser) Parse(posFileName, logFile string) ([]Parsed, error) {
 	}
 	result := make([]Parsed, 0)
 	if fstat.isNotRotated(lastFstat) {
-		if fstat != nil && fstat.Size < lastPos {
+		if fstat.Size < lastPos {
 			if !parser.Silent {
 				log.Println("Detect Truncate")
 			}
