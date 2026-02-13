@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.10](https://github.com/kazeburo/followparser/compare/v0.2.9...v0.2.10) - 2026-02-13
+- Create dependabot.yml by @kazeburo in https://github.com/kazeburo/followparser/pull/23
+- Update dependabot.yml by @kazeburo in https://github.com/kazeburo/followparser/pull/29
+- go: bump github.com/avast/retry-go/v4 from 4.6.1 to 4.7.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/28
+- ci: bump the dependencies group with 3 updates by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/30
+
 ## [v0.2.9](https://github.com/kazeburo/followparser/compare/v0.2.8...v0.2.9) - 2025-10-20
 - If a file is truncated, it will continue reading from the beginning. by @fujiwara in https://github.com/kazeburo/followparser/pull/21
 
