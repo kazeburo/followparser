@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.2.11](https://github.com/kazeburo/followparser/compare/v0.2.10...v0.2.11) - 2026-07-03
+
+- ci: bump Songmu/tagpr from 1.15.0 to 1.17.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/31
+- ci: bump the dependencies group across 1 directory with 2 updates by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/34
+- ci: bump actions/setup-go from 6.3.0 to 6.4.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/35
+- ci: bump Songmu/tagpr from 1.17.1 to 1.18.1 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/36
+- ci: bump Songmu/tagpr from 1.18.1 to 1.18.2 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/37
+- ci: bump Songmu/tagpr from 1.18.2 to 1.18.3 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/38
+- ci: bump the dependencies group across 1 directory with 3 updates by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/41
+- Change Dependabot schedule to weekly and add cooldown by @kazeburo in https://github.com/kazeburo/followparser/pull/42
+
 ## [v0.2.10](https://github.com/kazeburo/followparser/compare/v0.2.9...v0.2.10) - 2026-02-13
 - Create dependabot.yml by @kazeburo in https://github.com/kazeburo/followparser/pull/23
 - Update dependabot.yml by @kazeburo in https://github.com/kazeburo/followparser/pull/29
