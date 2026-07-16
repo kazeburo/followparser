@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.12](https://github.com/monitoring-forge/followparser/compare/v0.2.11...v0.2.12) - 2026-07-16
+
+- safer posfile by @kazeburo in https://github.com/monitoring-forge/followparser/pull/43
+
 ## [v0.2.11](https://github.com/kazeburo/followparser/compare/v0.2.10...v0.2.11) - 2026-07-03
 
 - ci: bump Songmu/tagpr from 1.15.0 to 1.17.0 in the dependencies group by @dependabot[bot] in https://github.com/kazeburo/followparser/pull/31
