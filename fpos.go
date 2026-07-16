@@ -77,21 +77,29 @@ func (pf *posFile) write(pos int64, fstat *fStat) error {
 		Inode: fstat.Inode,
 		Dev:   fstat.Dev,
 	}
-	file, err := os.Create(pf.filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 	jb, err := json.Marshal(fp)
 	if err != nil {
 		return err
 	}
-	_, err = file.Write(jb)
+	// To avoid race condition, we create a temporary file and then rename it to the target filename.
+	f, err := os.CreateTemp(filepath.Dir(pf.filename), filepath.Base(pf.filename))
 	if err != nil {
 		return err
 	}
-	return file.Sync()
-
+	defer f.Close()
+	_, err = f.Write(jb)
+	if err != nil {
+		return err
+	}
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), pf.filename)
 }
 
 func fileStat(filename string) (*fStat, error) {

@@ -32,7 +32,7 @@ As a library, implement the `Callback` interface and call `Parse` on a `Parser`.
 ```go
 cb := &MyParserImpl{}
 parser := &followparser.Parser{
-    WorkDir:  "/var/tmp", // where pos files are stored
+    WorkDir:  "/path/to/workdir", // where pos files are stored
     Callback: cb,
     // optional:
     // ArchiveDir: "/var/log/archive",
