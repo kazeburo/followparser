@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.13](https://github.com/monitoring-forge/followparser/compare/v0.2.12...v0.2.13) - 2026-07-17
+
+- Put back module path from monitoring-forge to kazeburo by @kazeburo in https://github.com/monitoring-forge/followparser/pull/45
+
 ## [v0.2.12](https://github.com/monitoring-forge/followparser/compare/v0.2.11...v0.2.12) - 2026-07-16
 
 - safer posfile by @kazeburo in https://github.com/monitoring-forge/followparser/pull/43
