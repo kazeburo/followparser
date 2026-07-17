@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.14](https://github.com/monitoring-forge/followparser/compare/v0.2.13...v0.2.14) - 2026-07-17
+
+- Rename module from kazeburo to monitoring-forge by @kazeburo in https://github.com/monitoring-forge/followparser/pull/47
+
 ## [v0.2.13](https://github.com/monitoring-forge/followparser/compare/v0.2.12...v0.2.13) - 2026-07-17
 
 - Put back module path from monitoring-forge to kazeburo by @kazeburo in https://github.com/monitoring-forge/followparser/pull/45
