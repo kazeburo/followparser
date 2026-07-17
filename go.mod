@@ -1,4 +1,4 @@
-module github.com/kazeburo/followparser
+module github.com/monitoring-forge/followparser
 
 go 1.25
 
